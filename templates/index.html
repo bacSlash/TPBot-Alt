@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TelePerformance AI Assistant</title>
+<link rel="stylesheet" href="/static/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+<div class="chat-container">
+    <div class="header">
+        <div class="logo">
+            <img src="/static/logo.jpg" alt="Company Logo" class="logo-image">
+        </div>
+        <div class="header-text">
+            <h1 class="company-title">TPBot</h1>
+            <p class="subtitle">Brought to you by TelePerformance</p>
+        </div>
+    </div>
+    <div class="chat-box" id="chat-box">
+        <div class="welcome-message">
+            <p>Hello! How can I assist you today?</p>
+        </div>
+    </div>
+    <div class="input-group">
+        <div class="input-wrapper">
+            <input type="text" id="user-input" placeholder="Type your message here..." autofocus>
+            <div class="button-group">
+                <button onclick="sendQuery(false)" class="send-btn">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+                <button onclick="toggleListening()" id="speak-btn" class="speak-btn">
+                    <i class="fas fa-microphone"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+recognition.lang = 'en-US';
+let isListening = false;
+
+function appendToChatBox(content, isUser = false) {
+    const chatBox = document.getElementById('chat-box');
+    const message = document.createElement('div');
+    message.className = isUser ? 'user-message' : 'bot-message';
+    message.innerHTML = content;
+    chatBox.appendChild(message);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function sendQuery(shouldSpeak = false) {
+    const query = document.getElementById('user-input').value;
+    if (query) {
+        appendToChatBox(query, true);
+        document.getElementById('user-input').value = '';
+        fetchQuery(query, shouldSpeak);
+    }
+}
+
+function toggleListening() {
+    const speakBtn = document.getElementById('speak-btn');
+    if (!isListening) {
+        isListening = true;
+        speakBtn.textContent = 'Listening...';
+        speakBtn.classList.add('listening');
+        startListening();
+    } else {
+        isListening = false;
+        speakBtn.textContent = 'Speak';
+        speakBtn.classList.remove('listening');
+        recognition.stop();
+    }
+}
+
+function startListening() {
+    recognition.start();
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById('user-input').value = transcript;
+        sendQuery(true);
+        toggleListening(); // Reset button state
+    };
+    recognition.onend = () => {
+        if (isListening) {
+            toggleListening(); // Reset button state if speech recognition ends unexpectedly
+        }
+    };
+}
+
+function fetchQuery(query, shouldSpeak) {
+    fetch('/ask', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: query })
+    })
+    .then(response => response.json())
+    .then(data => {
+        appendToChatBox(data.response);
+        if (shouldSpeak) {
+            speakResponse(data.response);
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function speakResponse(text) {
+    if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        window.speechSynthesis.speak(utterance);
+    } else {
+        console.error('Speech synthesis not supported');
+        appendToChatBox('Speech synthesis is not supported in your browser.', true);
+    }
+}
+
+// Add event listener for Enter key
+document.getElementById('user-input').addEventListener('keyup', function(event) {
+    if (event.key === 'Enter') {
+        sendQuery(false);
+    }
+});
+</script>
+</body>
+</html>
